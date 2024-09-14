@@ -1,72 +1,144 @@
-import { HocuspocusProvider } from '@hocuspocus/provider';
-import { withYHistory, withYjs, YjsEditor } from '@slate-yjs/core';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { createEditor, Descendant } from 'slate';
-import { Slate, withReact } from 'slate-react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import { createEditor, Transforms, Editor, Descendant, Element } from 'slate';
+import { Slate, Editable, withReact } from 'slate-react';
+import { WebsocketProvider } from 'y-websocket';
+// Import the core binding
+import {
+  withYjs,
+  slateNodesToInsertDelta,
+  YjsEditor,
+  yTextToSlateElement,
+  withYHistory,
+} from '@slate-yjs/core';
+
+// Import yjs
 import * as Y from 'yjs';
-import { ConnectionToggle } from '../components/ConnectionToggle/ConnectionToggle';
-import { CustomEditable } from '../components/CustomEditable/CustomEditable';
-import { FormatToolbar } from '../components/FormatToolbar/FormatToolbar';
-import { HOCUSPOCUS_ENDPOINT_URL } from '../config';
-import { withMarkdown } from '../plugins/withMarkdown';
-import { withNormalize } from '../plugins/withNormalize';
 
-export function SimplePage() {
-  const [value, setValue] = useState<Descendant[]>([]);
-  const [connected, setConnected] = useState(false);
+// Define a React component renderer for our code blocks.
+const CodeElement = (props: any) => (
+  <pre {...props.attributes}>
+    <code>{props.children}</code>
+  </pre>
+);
+// @ts-ignore
+window.editorC = Editor;
+// @ts-ignore
+window.yTextToSlateElement = yTextToSlateElement;
 
-  const provider = useMemo(
-    () =>
-      new HocuspocusProvider({
-        url: HOCUSPOCUS_ENDPOINT_URL,
-        name: 'slate-yjs-demo',
-        onConnect: () => setConnected(true),
-        onDisconnect: () => setConnected(false),
-        connect: false,
-      }),
+const DefaultElement = (props: any) => (
+  <p {...props.attributes}>{props.children}</p>
+);
+
+const initialValue: Descendant[] = [
+  {
+    type: 'paragraph',
+    children: [{ text: 'Try it out for yourself!' }],
+  },
+];
+
+const yDoc = new Y.Doc();
+
+const wsProvider = new WebsocketProvider(
+  'ws://localhost:1234',
+  'my-roomname',
+  yDoc
+);
+
+wsProvider.on('status', (event) => {
+  console.log(event.status); // logs "connected" or "disconnected"
+});
+
+const SimplePage = () => {
+  const [value, setValue] = useState(initialValue || []);
+  console.log('🚀 ~ MainEditor ~ value:', value);
+  const sharedType = useMemo(() => {
+    // Load the initial value into the yjs document
+    const actualSharedType = yDoc.get('content', Y.XmlText);
+    actualSharedType.insert(0, 'hello');
+
+    return actualSharedType as Y.XmlText;
+  }, []);
+
+  const editor = useMemo(
+    () => withYHistory(withYjs(withReact(createEditor()), sharedType)),
     []
   );
 
-  const toggleConnection = useCallback(() => {
-    if (connected) {
-      return provider.disconnect();
+  console.log('🚀 ~ MainEditor ~ editor:', editor);
+  useEffect(() => {}, []);
+
+  const renderElement = useCallback((props: any) => {
+    switch (props.element.type) {
+      case 'code':
+        return <CodeElement {...props} />;
+      case 'block-quote':
+        return <blockquote {...props.attributes}>{props.children}</blockquote>;
+      default:
+        return <DefaultElement {...props} />;
     }
+  }, []);
 
-    provider.connect();
-  }, [provider, connected]);
-
-  const editor = useMemo(() => {
-    const sharedType = provider.document.get('content', Y.XmlText) as Y.XmlText;
-
-    return withMarkdown(
-      withNormalize(
-        withReact(
-          withYHistory(
-            withYjs(createEditor(), sharedType, { autoConnect: false })
-          )
-        )
-      )
-    );
-  }, [provider.document]);
-
-  // Connect editor and provider in useEffect to comply with concurrent mode
-  // requirements.
-  useEffect(() => {
-    provider.connect();
-    return () => provider.disconnect();
-  }, [provider]);
   useEffect(() => {
     YjsEditor.connect(editor);
     return () => YjsEditor.disconnect(editor);
   }, [editor]);
+  // Define a React component to render leaves with bold text.
+  const Leaf = ({ attributes, children, leaf }) => {
+    if (leaf.bold) {
+      children = <strong>{children}</strong>;
+    }
+
+    if (leaf.code) {
+      children = <code>{children}</code>;
+    }
+
+    if (leaf.italic) {
+      children = <em>{children}</em>;
+    }
+
+    if (leaf.underline) {
+      children = <u>{children}</u>;
+    }
+
+    return <span {...attributes}>{children}</span>;
+  };
+
+  const renderLeaf = useCallback((props: any) => <Leaf {...props} />, []);
 
   return (
     <div className="flex justify-center my-32 mx-10">
-      <Slate value={value} onChange={setValue} editor={editor}>
-        <FormatToolbar />
-        <CustomEditable className="max-w-4xl w-full flex-col break-words" />
+      {/* <button onClick={(e) => {
+        e.preventDefault();
+        Transforms.select(editor, {
+          anchor: { path: [0, 0], offset: 0 },
+          focus: { path: [0, 0], offset: 5 },
+        });
+        let text = yDoc.getText('我是a');
+        text.insert(0, 'hhha');
+      }}>
+        点击更新yDoc1
+      </button> */}
+      <Slate
+        editor={editor}
+        value={value}
+        onChange={(_value) => {
+          console.log('changes', _value);
+          setValue({ ..._value });
+        }}
+      >
+        <Editable
+          renderElement={renderElement}
+          renderLeaf={renderLeaf}
+          onKeyDown={(event: any) => {
+            if (event.key === '&') {
+              event.preventDefault();
+              editor.insertText('and');
+            }
+          }}
+        />
       </Slate>
-      <ConnectionToggle connected={connected} onClick={toggleConnection} />
     </div>
   );
-}
+};
+
+export default SimplePage;

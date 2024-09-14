@@ -6,7 +6,7 @@ import 'virtual:windi-devtools';
 import { Navigator } from './components/Navigator/Navigator';
 import { NotFound } from './pages/NotFound';
 import { RemoteCursorsOverlayPage } from './pages/RemoteCursorOverlay';
-import { SimplePage } from './pages/Simple';
+import SimplePage from './pages/Simple';
 import { RemoteCursorDecorations } from './pages/RemoteCursorDecorations';
 
 ReactDOM.render(
