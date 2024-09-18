@@ -32,11 +32,12 @@ function Caret({ caretPosition, data }: CaretProps) {
   );
 }
 
-function RemoteSelection({
+export function RemoteSelection({
   data,
   selectionRects,
   caretPosition,
 }: CursorOverlayData<CursorData>) {
+  console.log('🚀 ~ caretPosition:', caretPosition);
   if (!data) {
     return null;
   }

@@ -65,7 +65,6 @@ const SimplePage = () => {
   );
 
   console.log('🚀 ~ MainEditor ~ editor:', editor);
-  useEffect(() => {}, []);
 
   const renderElement = useCallback((props: any) => {
     switch (props.element.type) {

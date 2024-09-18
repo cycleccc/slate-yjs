@@ -1,4 +1,5 @@
-import { HocuspocusProvider } from '@hocuspocus/provider';
+// import { HocuspocusProvider } from '@hocuspocus/provider';
+import { WebsocketProvider } from 'y-websocket';
 import { withCursors, withYHistory, withYjs, YjsEditor } from '@slate-yjs/core';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Descendant } from 'slate';
@@ -14,32 +15,22 @@ import { withNormalize } from '../../plugins/withNormalize';
 import { randomCursorData } from '../../utils';
 import { RemoteCursorOverlay } from './Overlay';
 
+const yDoc = new Y.Doc();
+
+const wsProvider = new WebsocketProvider(
+  'ws://localhost:1234',
+  'my-roomname',
+  yDoc
+);
+
+wsProvider.on('status', (event) => {
+  console.log(event.status); // logs "connected" or "disconnected"
+});
 export function RemoteCursorsOverlayPage() {
   const [value, setValue] = useState<Descendant[]>([]);
-  const [connected, setConnected] = useState(false);
-
-  const provider = useMemo(
-    () =>
-      new HocuspocusProvider({
-        url: HOCUSPOCUS_ENDPOINT_URL,
-        name: 'slate-yjs-demo',
-        onConnect: () => setConnected(true),
-        onDisconnect: () => setConnected(false),
-        connect: false,
-      }),
-    []
-  );
-
-  const toggleConnection = useCallback(() => {
-    if (connected) {
-      return provider.disconnect();
-    }
-
-    provider.connect();
-  }, [provider, connected]);
 
   const editor = useMemo(() => {
-    const sharedType = provider.document.get('content', Y.XmlText) as Y.XmlText;
+    const sharedType = yDoc.get('content', Y.XmlText) as Y.XmlText;
 
     return withMarkdown(
       withNormalize(
@@ -47,7 +38,7 @@ export function RemoteCursorsOverlayPage() {
           withYHistory(
             withCursors(
               withYjs(createEditor(), sharedType, { autoConnect: false }),
-              provider.awareness,
+              wsProvider.awareness,
               {
                 data: randomCursorData(),
               }
@@ -56,14 +47,14 @@ export function RemoteCursorsOverlayPage() {
         )
       )
     );
-  }, [provider.awareness, provider.document]);
+  }, [wsProvider.awareness]);
 
   // Connect editor and provider in useEffect to comply with concurrent mode
   // requirements.
   useEffect(() => {
-    provider.connect();
-    return () => provider.disconnect();
-  }, [provider]);
+    wsProvider.connect();
+    return () => wsProvider.disconnect();
+  }, [wsProvider]);
   useEffect(() => {
     YjsEditor.connect(editor);
     return () => YjsEditor.disconnect(editor);
@@ -73,10 +64,9 @@ export function RemoteCursorsOverlayPage() {
     <React.Fragment>
       <Slate value={value} onChange={setValue} editor={editor}>
         <RemoteCursorOverlay className="flex justify-center my-32 mx-10">
-          <FormatToolbar />
+          {/* <FormatToolbar /> */}
           <CustomEditable className="max-w-4xl w-full flex-col break-words" />
         </RemoteCursorOverlay>
-        <ConnectionToggle connected={connected} onClick={toggleConnection} />
       </Slate>
     </React.Fragment>
   );
