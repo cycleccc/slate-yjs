@@ -1,4 +1,5 @@
-import { HocuspocusProvider } from '@hocuspocus/provider';
+// import { HocuspocusProvider } from '@hocuspocus/provider';
+import { WebsocketProvider } from 'y-websocket';
 import { withCursors, withYHistory, withYjs, YjsEditor } from '@slate-yjs/core';
 import {
   getRemoteCaretsOnLeaf,
@@ -18,6 +19,18 @@ import { withMarkdown } from '../plugins/withMarkdown';
 import { withNormalize } from '../plugins/withNormalize';
 import { CursorData } from '../types';
 import { addAlpha, randomCursorData } from '../utils';
+
+const yDoc = new Y.Doc();
+
+const wsProvider = new WebsocketProvider(
+  'ws://localhost:1234',
+  'my-roomname',
+  yDoc
+);
+
+wsProvider.on('status', (event) => {
+  console.log(event.status); // logs "connected" or "disconnected"
+});
 
 function renderDecoratedLeaf(props: RenderLeafProps) {
   getRemoteCursorsOnLeaf<CursorData, Text>(props.leaf).forEach((cursor) => {
@@ -71,30 +84,29 @@ function DecoratedEditable() {
 
 export function RemoteCursorDecorations() {
   const [value, setValue] = useState<Descendant[]>([]);
-  const [connected, setConnected] = useState(false);
 
-  const provider = useMemo(
-    () =>
-      new HocuspocusProvider({
-        url: HOCUSPOCUS_ENDPOINT_URL,
-        name: 'slate-yjs-demo',
-        onConnect: () => setConnected(true),
-        onDisconnect: () => setConnected(false),
-        connect: false,
-      }),
-    []
-  );
+  //   const provider = useMemo(
+  //     () =>
+  //       new HocuspocusProvider({
+  //         url: HOCUSPOCUS_ENDPOINT_URL,
+  //         name: 'slate-yjs-demo',
+  //         onConnect: () => setConnected(true),
+  //         onDisconnect: () => setConnected(false),
+  //         connect: false,
+  //       }),
+  //     []
+  //   );
 
   const toggleConnection = useCallback(() => {
     if (connected) {
-      return provider.disconnect();
+      return wsProvider.disconnect();
     }
 
-    provider.connect();
-  }, [provider, connected]);
+    wsProvider.connect();
+  }, []);
 
   const editor = useMemo(() => {
-    const sharedType = provider.document.get('content', Y.XmlText) as Y.XmlText;
+    const sharedType = yDoc.get('content', Y.XmlText) as Y.XmlText;
 
     return withMarkdown(
       withNormalize(
@@ -103,7 +115,7 @@ export function RemoteCursorDecorations() {
             withYHistory(
               withYjs(createEditor(), sharedType, { autoConnect: false })
             ),
-            provider.awareness,
+            wsProvider.awareness,
             {
               data: randomCursorData(),
             }
@@ -111,14 +123,14 @@ export function RemoteCursorDecorations() {
         )
       )
     );
-  }, [provider.awareness, provider.document]);
+  }, []);
 
   // Connect editor and provider in useEffect to comply with concurrent mode
   // requirements.
   useEffect(() => {
-    provider.connect();
-    return () => provider.disconnect();
-  }, [provider]);
+    wsProvider.connect();
+    return () => wsProvider.disconnect();
+  }, []);
   useEffect(() => {
     YjsEditor.connect(editor);
     return () => YjsEditor.disconnect(editor);
@@ -127,10 +139,10 @@ export function RemoteCursorDecorations() {
   return (
     <div className="flex justify-center my-32 mx-10">
       <Slate value={value} onChange={setValue} editor={editor}>
-        <FormatToolbar />
+        {/* <FormatToolbar /> */}
         <DecoratedEditable />
       </Slate>
-      <ConnectionToggle connected={connected} onClick={toggleConnection} />
+      {/* <ConnectionToggle connected={connected} onClick={toggleConnection} /> */}
     </div>
   );
 }

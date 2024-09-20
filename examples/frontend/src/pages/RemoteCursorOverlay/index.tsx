@@ -47,14 +47,14 @@ export function RemoteCursorsOverlayPage() {
         )
       )
     );
-  }, [wsProvider.awareness]);
+  }, []);
 
   // Connect editor and provider in useEffect to comply with concurrent mode
   // requirements.
   useEffect(() => {
     wsProvider.connect();
     return () => wsProvider.disconnect();
-  }, [wsProvider]);
+  }, []);
   useEffect(() => {
     YjsEditor.connect(editor);
     return () => YjsEditor.disconnect(editor);
